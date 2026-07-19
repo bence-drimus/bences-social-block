@@ -10,9 +10,11 @@ export interface YoutubeSettings {
   list: string[];
 }
 
+export interface SiteSettings {
+  reddit: RedditSettings;
+  youtube: YoutubeSettings;
+}
+
 export interface StorageData {
-  sites: {
-    reddit: RedditSettings;
-    youtube: YoutubeSettings;
-  };
+  sites: SiteSettings;
 }
