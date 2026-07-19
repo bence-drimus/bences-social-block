@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Social Block",
+  "version": "1.0",
+  "description": "An extension that helps you achieve focus by allowing you to block all the distracting features of sites that you may require for work/study",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "permissions": ["storage"]
+}
