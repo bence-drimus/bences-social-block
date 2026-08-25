@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --config vite.content.config.ts",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "node src/match.check.ts"
   },
   "dependencies": {
     "react": "^19.2.7",

@@ -15,7 +15,7 @@ export async function loadSettings(): Promise<StorageData> {
         if (result.sites) {
           resolve({ sites: result.sites });
         } else {
-          resolve(DEFAULT_SETTINGS);
+          resolve(structuredClone(DEFAULT_SETTINGS));
         }
       },
     );

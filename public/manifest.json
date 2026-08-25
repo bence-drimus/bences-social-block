@@ -4,7 +4,20 @@
   "version": "1.0",
   "description": "An extension that helps you achieve focus by allowing you to block all the distracting features of sites that you may require for work/study",
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "index.html"
   },
-  "permissions": ["storage"]
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
 }

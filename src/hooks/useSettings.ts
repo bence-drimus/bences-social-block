@@ -2,25 +2,24 @@ import { useState, useEffect } from "react";
 import type { Site, SiteSettings } from "../types";
 import { loadSettings, saveSettings } from "../storage";
 
-export function useSettings(site: Site) {
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
+export function useSettings() {
+  const [sites, setSites] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
-    loadSettings().then((data) => {
-      setSettings(data.sites);
-    });
+    loadSettings().then((data) => setSites(data.sites));
   }, []);
 
-  function updateSiteSettings(update: Partial<SiteSettings[Site]>) {
-    if (!settings) return;
-    const updated = { ...settings, [site]: { ...settings[site], ...update } };
-    setSettings(updated);
+  // Generic in the site, otherwise Partial<SiteSettings[Site]> collapses to the keys
+  // the two sites share ({ mode?: Modes }) and `{ list }` stops typechecking.
+  function update<S extends Site>(site: S, patch: Partial<SiteSettings[S]>) {
+    if (!sites) return;
+    const next: SiteSettings = {
+      ...sites,
+      [site]: { ...sites[site], ...patch },
+    };
+    setSites(next);
+    saveSettings({ sites: next });
   }
 
-  function save() {
-    if (!settings) return;
-    saveSettings({ sites: settings });
-  }
-
-  return { settings, updateSiteSettings, save };
+  return { sites, update };
 }

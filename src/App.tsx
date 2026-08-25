@@ -1,122 +1,128 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { useSettings } from "./hooks/useSettings";
+import { normaliseChannel } from "./match";
+import type { Modes, Site } from "./types";
 
-function App() {
-  const [count, setCount] = useState(0)
+const MODES: Modes[] = ["none", "blockfull", "whitelist", "blacklist"];
+
+// ponytail: hand-drawn glyphs, swap in the real brand SVGs if they read badly at 22px
+const ICONS: Record<Site, ReactNode> = {
+  reddit: (
+    <>
+      <circle cx="12" cy="14.5" r="6.5" />
+      <circle cx="5.5" cy="11.5" r="2" />
+      <circle cx="18.5" cy="11.5" r="2" />
+      <path d="M12 8l3.5-4" />
+      <path d="M9 17.5c1.8 1.2 4.2 1.2 6 0" />
+      <circle cx="16.5" cy="3.5" r="1.5" className="solid" />
+      <circle cx="9.8" cy="14" r="1.1" className="solid" />
+      <circle cx="14.2" cy="14" r="1.1" className="solid" />
+    </>
+  ),
+  youtube: (
+    <>
+      <rect x="1.5" y="5" width="21" height="14" rx="4" />
+      <path d="M10 9l6 3-6 3z" className="solid" />
+    </>
+  ),
+};
+
+function ChannelList({
+  list,
+  onChange,
+}: {
+  list: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function add(e: FormEvent) {
+    e.preventDefault();
+    const key = normaliseChannel(draft);
+    const duplicate = list.some((c) => normaliseChannel(c) === key);
+    if (key && !duplicate) onChange([...list, draft.trim()]);
+    setDraft("");
+  }
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <form onSubmit={add}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="@channel, URL or name"
+          aria-label="Channel to add"
+        />
+        <button type="submit">Add</button>
+      </form>
+      <ul>
+        {list.map((channel) => (
+          <li key={channel}>
+            <span>{channel}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${channel}`}
+              onClick={() => onChange(list.filter((c) => c !== channel))}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
     </>
-  )
+  );
 }
 
-export default App
+export default function App() {
+  const { sites, update } = useSettings();
+  const [active, setActive] = useState<Site>("youtube");
+  if (!sites) return null;
+
+  const { mode } = sites[active];
+  const filtering = mode === "whitelist" || mode === "blacklist";
+
+  return (
+    <div className="popup">
+      <nav>
+        {(Object.keys(sites) as Site[]).map((site) => (
+          <button
+            key={site}
+            type="button"
+            aria-label={site}
+            aria-pressed={site === active}
+            onClick={() => setActive(site)}
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              {ICONS[site]}
+            </svg>
+          </button>
+        ))}
+      </nav>
+
+      <section>
+        <h1>{active}</h1>
+        <label>
+          Mode
+          <select
+            value={mode}
+            onChange={(e) => update(active, { mode: e.target.value as Modes })}
+          >
+            {MODES.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {active === "youtube" && filtering && (
+          <ChannelList
+            list={sites.youtube.list}
+            onChange={(next) => update("youtube", { list: next })}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
