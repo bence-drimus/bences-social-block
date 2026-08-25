@@ -8,6 +8,8 @@ export interface RedditSettings {
 export interface YoutubeSettings {
   mode: Modes;
   list: string[];
+  /** Feature ids from FEATURES that are switched off. Absent means enabled. */
+  disabled: string[];
 }
 
 export interface SiteSettings {

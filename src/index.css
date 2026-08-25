@@ -74,7 +74,7 @@ form {
   margin: 12px 0 8px;
 }
 
-input {
+form input {
   flex: 1;
   min-width: 0;
   padding: 4px 6px;
@@ -129,4 +129,36 @@ li button {
 
 li button:hover {
   opacity: 1;
+}
+
+section {
+  overflow-y: auto;
+  max-height: 520px;
+}
+
+fieldset {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+legend {
+  padding: 0 6px 0 0;
+  opacity: 0.6;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+fieldset label {
+  justify-content: flex-start;
+  padding: 2px 0;
+}
+
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.6;
 }

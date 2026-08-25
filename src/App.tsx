@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { FEATURES } from "./features";
 import { useSettings } from "./hooks/useSettings";
 import { normaliseChannel } from "./match";
 import type { Modes, Site } from "./types";
@@ -74,6 +75,40 @@ function ChannelList({
   );
 }
 
+function FeatureToggles({
+  disabled,
+  onChange,
+}: {
+  disabled: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <>
+      {[...new Set(FEATURES.map((f) => f.group))].map((group) => (
+        <fieldset key={group}>
+          <legend>{group}</legend>
+          {FEATURES.filter((f) => f.group === group).map((feature) => (
+            <label key={feature.id}>
+              <input
+                type="checkbox"
+                checked={disabled.includes(feature.id)}
+                onChange={(e) =>
+                  onChange(
+                    e.target.checked
+                      ? [...disabled, feature.id]
+                      : disabled.filter((id) => id !== feature.id),
+                  )
+                }
+              />
+              {feature.label}
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    </>
+  );
+}
+
 export default function App() {
   const { sites, update } = useSettings();
   const [active, setActive] = useState<Site>("youtube");
@@ -117,9 +152,21 @@ export default function App() {
         </label>
 
         {active === "youtube" && filtering && (
-          <ChannelList
-            list={sites.youtube.list}
-            onChange={(next) => update("youtube", { list: next })}
+          <>
+            <ChannelList
+              list={sites.youtube.list}
+              onChange={(next) => update("youtube", { list: next })}
+            />
+            {mode === "whitelist" && (
+              <p className="hint">Your subscriptions are always allowed.</p>
+            )}
+          </>
+        )}
+
+        {active === "youtube" && (
+          <FeatureToggles
+            disabled={sites.youtube.disabled ?? []}
+            onChange={(next) => update("youtube", { disabled: next })}
           />
         )}
       </section>

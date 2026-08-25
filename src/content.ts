@@ -1,4 +1,5 @@
-import { channelFromRows, shouldHideTile } from "./match";
+import { FEATURES } from "./features";
+import { channelFromRows, isBlockedPath, shouldHideTile } from "./match";
 import type { Modes, SiteSettings } from "./types";
 
 // ponytail: YouTube renames these renderers and A/B tests layouts. If filtering stops
@@ -13,9 +14,25 @@ const TILE_SELECTORS = [
   "yt-lockup-view-model",
 ].join(",");
 
+// Shelves that only their heading distinguishes. The title element is read rather than
+// the whole <h2>, which would drag in the subtitle and the badge text.
+const SHELF = [
+  "ytd-rich-section-renderer",
+  "ytd-shelf-renderer",
+  "ytd-item-section-renderer",
+].join(",");
+const SHELF_TITLE = "#title,.ytShelfHeaderLayoutTitle";
+
 const CHANNEL_HREF = /(?:^|youtube\.com)\/(?:@|channel\/|c\/|user\/)/i;
+// Every channel link in the sidebar guide is a subscription - Home, Shorts, Explore and
+// You all point at feed paths. Structural, so it does not care about the UI language.
+const GUIDE_SUBS = "ytd-guide-renderer a[href]";
+const SUBS_KEY = "sbSubs";
+const SUBS_PAGE = "/feed/subscriptions";
+const SUBS_ELSEWHERE = "subsElsewhere";
 const OVERLAY_ID = "sb-blocked";
 const STYLE_ID = "sb-style";
+const NOTE_ID = "sb-blocked-note";
 
 const CSS = `
 .sb-hide { display: none !important; }
@@ -30,11 +47,40 @@ const CSS = `
   color: #f1f1f1;
   font: 600 20px/1.4 system-ui, sans-serif;
 }
+html.sb-blocked-page ytd-page-manager { display: none !important; }
+#${NOTE_ID} {
+  position: fixed;
+  top: 40vh;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 2147483646;
+  opacity: 0.6;
+  font: 500 16px/1.4 system-ui, sans-serif;
+}
 `;
 
 let mode: Modes = "none";
 let list: string[] = [];
+let disabled: string[] = [];
+let css = CSS;
+let shelfTitles: string[] = [];
+let subs: string[] = [];
 let bouncedFrom = "";
+
+/**
+ * One rule per disabled feature. Separate rules on purpose: a selector this browser cannot
+ * parse takes its own rule down with it, not every other feature's as well.
+ */
+function rebuildCss() {
+  const rules = FEATURES.filter((f) => f.hide && disabled.includes(f.id)).map(
+    (f) => `${f.hide} { display: none !important; }`,
+  );
+  css = [CSS, ...rules].join("\n");
+  shelfTitles = FEATURES.filter((f) => f.shelfTitle && disabled.includes(f.id)).map(
+    (f) => f.shelfTitle as string,
+  );
+}
 
 // The newer lockup tiles put the channel name in a plain text metadata row rather than a
 // link, so hrefs alone find nothing on them. ponytail: selectors to verify in devtools if
@@ -68,12 +114,55 @@ function channelKeys(root: Element): string[] {
   return keys;
 }
 
+/**
+ * Subscribed channels, allowed implicitly in whitelist mode. Cached in storage because the
+ * guide is not rendered on every page, and an empty read would unhide nothing but hide
+ * everything you are subscribed to.
+ */
+function readSubs() {
+  const found = new Set<string>();
+  for (const a of document.querySelectorAll<HTMLAnchorElement>(GUIDE_SUBS)) {
+    const href = a.getAttribute("href");
+    if (!href || !CHANNEL_HREF.test(href)) continue;
+    found.add(href);
+    const text = a.textContent?.trim();
+    if (text) found.add(text);
+  }
+  if (!found.size) return;
+  if (found.size === subs.length && subs.every((c) => found.has(c))) return;
+  subs = [...found];
+  chrome.storage.local.set({ [SUBS_KEY]: subs });
+}
+
+/** Whitelist mode allows the subscriptions on top of the list the popup shows. */
+function allowed() {
+  return mode === "whitelist" ? [...list, ...subs] : list;
+}
+
 function injectCss() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = CSS;
-  document.documentElement.append(style);
+  let style = document.getElementById(STYLE_ID);
+  if (!style) {
+    style = document.createElement("style");
+    style.id = STYLE_ID;
+    document.documentElement.append(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+}
+
+/** Blank a page whose nav button is switched off, leaving the header and search usable. */
+function blockPage() {
+  document.documentElement.classList.add("sb-blocked-page");
+  for (const video of document.querySelectorAll("video")) video.pause();
+  if (document.getElementById(NOTE_ID)) return;
+  const note = document.createElement("div");
+  note.id = NOTE_ID;
+  note.textContent = "Disabled by Social Block";
+  document.documentElement.append(note);
+}
+
+function unblockPage() {
+  document.documentElement.classList.remove("sb-blocked-page");
+  document.getElementById(NOTE_ID)?.remove();
 }
 
 function blockSite() {
@@ -86,9 +175,9 @@ function blockSite() {
 }
 
 /** Bounce off a watch page whose channel is filtered out. */
-function checkWatchPage() {
+function checkWatchPage(allow: string[]) {
   const owner = document.querySelector("ytd-watch-metadata #owner");
-  if (!owner || !shouldHideTile(channelKeys(owner), mode, list)) return;
+  if (!owner || !shouldHideTile(channelKeys(owner), mode, allow)) return;
   if (bouncedFrom === location.href) return;
   bouncedFrom = location.href;
   if (history.length > 1) history.back();
@@ -104,14 +193,36 @@ function apply() {
   }
   document.getElementById(OVERLAY_ID)?.remove();
 
+  if (isBlockedPath(location.pathname, disabled)) {
+    blockPage();
+    return;
+  }
+  unblockPage();
+
+  if (shelfTitles.length) {
+    for (const shelf of document.querySelectorAll(SHELF)) {
+      const title = shelf.querySelector(SHELF_TITLE)?.textContent?.trim();
+      shelf.classList.toggle("sb-hide", !!title && shelfTitles.includes(title));
+    }
+  }
+
+  readSubs();
+  const allow = allowed();
+  // Subscribed videos are penned into their own feed. Reusing blacklist means "is one of
+  // these channels" is the tested comparison, normalising and all.
+  const penSubs =
+    disabled.includes(SUBS_ELSEWHERE) && !location.pathname.startsWith(SUBS_PAGE);
+
   for (const tile of document.querySelectorAll(TILE_SELECTORS)) {
+    const keys = channelKeys(tile);
     tile.classList.toggle(
       "sb-hide",
-      shouldHideTile(channelKeys(tile), mode, list),
+      shouldHideTile(keys, mode, allow) ||
+        (penSubs && shouldHideTile(keys, "blacklist", subs)),
     );
   }
 
-  if (location.pathname === "/watch") checkWatchPage();
+  if (location.pathname === "/watch") checkWatchPage(allow);
 }
 
 let queued = false;
@@ -125,11 +236,17 @@ function schedule() {
 }
 
 function loadSettings() {
-  chrome.storage.local.get("sites", (result: { sites?: SiteSettings }) => {
-    mode = result.sites?.youtube?.mode ?? "none";
-    list = result.sites?.youtube?.list ?? [];
-    apply();
-  });
+  chrome.storage.local.get(
+    ["sites", SUBS_KEY],
+    (result: { sites?: SiteSettings; [SUBS_KEY]?: string[] }) => {
+      mode = result.sites?.youtube?.mode ?? "none";
+      list = result.sites?.youtube?.list ?? [];
+      disabled = result.sites?.youtube?.disabled ?? [];
+      if (result[SUBS_KEY]?.length) subs = result[SUBS_KEY];
+      rebuildCss();
+      apply();
+    },
+  );
 }
 
 loadSettings();
@@ -147,6 +264,23 @@ Object.assign(window, {
   __sb: () => ({
     mode,
     list,
+    subs,
+    disabled,
+    shelfTitles,
+    hiding: FEATURES.filter((f) => f.hide && disabled.includes(f.id)).map((f) => {
+      const found = document.querySelectorAll(f.hide as string);
+      return {
+        id: f.id,
+        matched: found.length,
+        display: found[0] ? getComputedStyle(found[0]).display : "-",
+      };
+    }),
+    rules: document.getElementById(STYLE_ID)?.textContent?.split("\n").length ?? 0,
+    shelves: [...document.querySelectorAll(SHELF)].map((sh) => ({
+      title: sh.querySelector(SHELF_TITLE)?.textContent?.trim(),
+      hidden: sh.classList.contains("sb-hide"),
+    })),
+    blocked: isBlockedPath(location.pathname, disabled),
     tiles: [...document.querySelectorAll(TILE_SELECTORS)].map((t) => ({
       tag: t.tagName.toLowerCase(),
       keys: channelKeys(t),

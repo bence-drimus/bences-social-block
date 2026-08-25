@@ -1,4 +1,5 @@
 // .ts extension because this file is also checked by the nodenext project (match.check.ts)
+import { FEATURES } from "./features.ts";
 import type { Modes } from "./types.ts";
 
 /** `@MKBHD`, `youtube.com/@mkbhd/videos` and `MKBHD` all collapse to `mkbhd`. */
@@ -38,4 +39,11 @@ export function shouldHideTile(
 export function channelFromRows(rows: string[]): string | null {
   if (rows.length < 2) return null;
   return rows[0].trim() || null;
+}
+
+/** True when a disabled feature owns this path, so the page should be blanked. */
+export function isBlockedPath(pathname: string, disabled: string[]): boolean {
+  return FEATURES.some(
+    (f) => f.block && disabled.includes(f.id) && f.block.test(pathname),
+  );
 }

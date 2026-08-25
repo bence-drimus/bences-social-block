@@ -3,7 +3,7 @@ import type { StorageData } from "./types";
 const DEFAULT_SETTINGS: StorageData = {
   sites: {
     reddit: { mode: "none" },
-    youtube: { mode: "none", list: [] },
+    youtube: { mode: "none", list: [], disabled: [] },
   },
 };
 
