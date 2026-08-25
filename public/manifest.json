@@ -19,5 +19,11 @@
       ],
       "run_at": "document_start"
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "social-block@lessquod",
+      "strict_min_version": "115.0"
+    }
+  }
 }
