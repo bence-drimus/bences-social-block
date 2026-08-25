@@ -14,9 +14,9 @@ export function normaliseChannel(raw: string): string {
 }
 
 /**
- * `keys` are every channel identifier found on a tile (hrefs and link text).
- * An empty `keys` means we could not tell whose video it is, and such tiles are
- * always left alone - so a stale selector filters less rather than blanking the page.
+ * `keys` are every channel identifier found on a tile (hrefs and link text), An empty `keys`
+ * means we could not tell whose video it is, and such tiles are always left alone - so a
+ * stale selector filters less rather than blanking the page.
  */
 export function shouldHideTile(
   keys: string[],

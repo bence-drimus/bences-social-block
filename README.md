@@ -10,6 +10,9 @@ Pick a mode per site from the popup:
 - `blacklist` hides video tiles from the channels on your list
 - `blockfull` blocks the whole site
 
+In whitelist mode your subscriptions are allowed automatically and are not shown in the
+list.
+
 Channels can be added as a handle (`@mkbhd`), a URL, or the display name. Opening a video
 whose channel is filtered out bounces you back to the previous page.
 

@@ -1,5 +1,9 @@
 import { FEATURES } from "./features";
-import { channelFromRows, isBlockedPath, shouldHideTile } from "./match";
+import {
+  channelFromRows,
+  isBlockedPath,
+  shouldHideTile,
+} from "./match";
 import type { Modes, SiteSettings } from "./types";
 
 // ponytail: YouTube renames these renderers and A/B tests layouts. If filtering stops
@@ -215,10 +219,13 @@ function apply() {
 
   for (const tile of document.querySelectorAll(TILE_SELECTORS)) {
     const keys = channelKeys(tile);
+    // A channel you listed yourself outranks the pen. Subs are left out of this check on
+    // purpose, so the pen still herds the ones you never asked for back to their own page.
+    const explicit = !shouldHideTile(keys, "whitelist", list);
     tile.classList.toggle(
       "sb-hide",
       shouldHideTile(keys, mode, allow) ||
-        (penSubs && shouldHideTile(keys, "blacklist", subs)),
+        (penSubs && !explicit && shouldHideTile(keys, "blacklist", subs)),
     );
   }
 

@@ -47,7 +47,8 @@ function ChannelList({
   }
 
   return (
-    <>
+    <fieldset>
+      <legend>Channels</legend>
       <form onSubmit={add}>
         <input
           value={draft}
@@ -71,7 +72,7 @@ function ChannelList({
           </li>
         ))}
       </ul>
-    </>
+    </fieldset>
   );
 }
 
