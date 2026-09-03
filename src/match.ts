@@ -1,6 +1,6 @@
 // .ts extension because this file is also checked by the nodenext project (match.check.ts)
 import { FEATURES } from "./features.ts";
-import type { Modes } from "./types.ts";
+import type { Modes, Site } from "./types.ts";
 
 /** `@MKBHD`, `youtube.com/@mkbhd/videos` and `MKBHD` all collapse to `mkbhd`. */
 export function normaliseChannel(raw: string): string {
@@ -41,9 +41,16 @@ export function channelFromRows(rows: string[]): string | null {
   return rows[0].trim() || null;
 }
 
-/** True when a disabled feature owns this path, so the page should be blanked. */
-export function isBlockedPath(pathname: string, disabled: string[]): boolean {
-  return FEATURES.some(
+/**
+ * True when a disabled feature owns this path, so the page should be blanked. Scoped to
+ * one site: ids are per-site tables, and both sites have a home page.
+ */
+export function isBlockedPath(
+  pathname: string,
+  disabled: string[],
+  site: Site,
+): boolean {
+  return FEATURES[site].some(
     (f) => f.block && disabled.includes(f.id) && f.block.test(pathname),
   );
 }

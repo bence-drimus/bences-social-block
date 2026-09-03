@@ -1,7 +1,9 @@
 body {
   width: 280px;
   margin: 0;
-  font: 14px system-ui, sans-serif;
+  font:
+    14px system-ui,
+    sans-serif;
   color-scheme: light dark;
 }
 
@@ -156,6 +158,9 @@ fieldset label {
   padding: 2px 0;
 }
 
+fieldset label.child {
+  padding-left: 20px;
+}
 
 .hint {
   margin: 0;

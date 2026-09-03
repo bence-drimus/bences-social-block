@@ -16,6 +16,14 @@ list.
 Channels can be added as a handle (`@mkbhd`), a URL, or the display name. Opening a video
 whose channel is filtered out bounces you back to the previous page.
 
+Facebook has its own toggles: the post composer, Stories, Reels in the feed and People
+you may know under Hide content; Home, Reels, Groups, Gaming, Friends, Memories, Saved and Marketplace under
+Block pages; Meta AI, Your shortcuts, Notifications, Messenger, the Facebook menu, the
+contacts sidebar and the whole left sidebar under Hide interface. Ticking a page also
+removes its entry from the left rail. Groups blocks the browse pages only, so
+an individual group you joined stays readable. Its modes are `none` and `blockfull` - the
+other two filter by channel, which Facebook has no equivalent of yet.
+
 Reddit is in the popup but does nothing yet, and categories are not implemented.
 
 ## Build

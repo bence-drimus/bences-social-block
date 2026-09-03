@@ -1,10 +1,6 @@
 import { FEATURES } from "./features";
-import {
-  channelFromRows,
-  isBlockedPath,
-  shouldHideTile,
-} from "./match";
-import type { Modes, SiteSettings } from "./types";
+import { channelFromRows, isBlockedPath, shouldHideTile } from "./match";
+import type { Modes, Site, SiteSettings } from "./types";
 
 // ponytail: YouTube renames these renderers and A/B tests layouts. If filtering stops
 // working, check which of these still match in devtools. A stale entry only means we
@@ -18,14 +14,27 @@ const TILE_SELECTORS = [
   "yt-lockup-view-model",
 ].join(",");
 
-// Shelves that only their heading distinguishes. The title element is read rather than
-// the whole <h2>, which would drag in the subtitle and the badge text.
-const SHELF = [
-  "ytd-rich-section-renderer",
-  "ytd-shelf-renderer",
-  "ytd-item-section-renderer",
-].join(",");
-const SHELF_TITLE = "#title,.ytShelfHeaderLayoutTitle";
+/**
+ * Sections that only their heading distinguishes. The title element is read rather than
+ * the whole header, which would drag in subtitles and badge text. Facebook's rail sections
+ * are a div wrapping a heading and a list, so `> ul` is what separates one from its own
+ * ancestors.
+ */
+const SHELVES: Record<Site, { container: string; title: string }> = {
+  youtube: {
+    container:
+      "ytd-rich-section-renderer,ytd-shelf-renderer,ytd-item-section-renderer",
+    title: "#title,.ytShelfHeaderLayoutTitle",
+  },
+  facebook: {
+    // Unscoped on purpose: the left rail carries no role="navigation" - its landmark is an
+    // `h2` - so anchoring there matched nothing. A direct `> ul` child narrows it to list
+    // sections, and the heading text below is what actually decides.
+    container: "div:has(> ul)",
+    title: "h3",
+  },
+  reddit: { container: "", title: "" },
+};
 
 const CHANNEL_HREF = /(?:^|youtube\.com)\/(?:@|channel\/|c\/|user\/)/i;
 // Every channel link in the sidebar guide is a subscription - Home, Shorts, Explore and
@@ -34,6 +43,12 @@ const GUIDE_SUBS = "ytd-guide-renderer a[href]";
 const SUBS_KEY = "sbSubs";
 const SUBS_PAGE = "/feed/subscriptions";
 const SUBS_ELSEWHERE = "subsElsewhere";
+// One content script serves both sites: the CSS, page blanking and settings plumbing are
+// site-agnostic, and only the tile filtering below is YouTube's.
+const SITE: Site = location.hostname.endsWith("facebook.com")
+  ? "facebook"
+  : "youtube";
+
 const OVERLAY_ID = "sb-blocked";
 const STYLE_ID = "sb-style";
 const NOTE_ID = "sb-blocked-note";
@@ -51,7 +66,8 @@ const CSS = `
   color: #f1f1f1;
   font: 600 20px/1.4 system-ui, sans-serif;
 }
-html.sb-blocked-page ytd-page-manager { display: none !important; }
+html.sb-blocked-page ytd-page-manager,
+html.sb-blocked-page div[role="main"] { display: none !important; }
 #${NOTE_ID} {
   position: fixed;
   top: 40vh;
@@ -71,19 +87,25 @@ let css = CSS;
 let shelfTitles: string[] = [];
 let subs: string[] = [];
 let bouncedFrom = "";
+let hidShelf = false;
+
+/** The rows for whichever site this injection landed on. */
+function features() {
+  return FEATURES[SITE];
+}
 
 /**
  * One rule per disabled feature. Separate rules on purpose: a selector this browser cannot
  * parse takes its own rule down with it, not every other feature's as well.
  */
 function rebuildCss() {
-  const rules = FEATURES.filter((f) => f.hide && disabled.includes(f.id)).map(
-    (f) => `${f.hide} { display: none !important; }`,
-  );
+  const rules = features()
+    .filter((f) => f.hide && disabled.includes(f.id))
+    .map((f) => `${f.hide} { display: none !important; }`);
   css = [CSS, ...rules].join("\n");
-  shelfTitles = FEATURES.filter((f) => f.shelfTitle && disabled.includes(f.id)).map(
-    (f) => f.shelfTitle as string,
-  );
+  shelfTitles = features()
+    .filter((f) => f.shelfTitle && disabled.includes(f.id))
+    .map((f) => f.shelfTitle as string);
 }
 
 // The newer lockup tiles put the channel name in a plain text metadata row rather than a
@@ -197,25 +219,41 @@ function apply() {
   }
   document.getElementById(OVERLAY_ID)?.remove();
 
-  if (isBlockedPath(location.pathname, disabled)) {
+  if (isBlockedPath(location.pathname, disabled, SITE)) {
     blockPage();
     return;
   }
   unblockPage();
 
-  if (shelfTitles.length) {
-    for (const shelf of document.querySelectorAll(SHELF)) {
-      const title = shelf.querySelector(SHELF_TITLE)?.textContent?.trim();
-      shelf.classList.toggle("sb-hide", !!title && shelfTitles.includes(title));
-    }
-  }
+  hideNamedShelves();
 
+  if (SITE === "youtube") applyYoutube();
+}
+
+/** Sections CSS cannot name, matched on their heading text. */
+function hideNamedShelves() {
+  const { container, title } = SHELVES[SITE];
+  // The flag buys one more pass after the last title is unticked, to take the class back
+  // off. Without it, unticking left the section hidden until a reload.
+  if (!container || (!shelfTitles.length && !hidShelf)) return;
+  hidShelf = false;
+  for (const shelf of document.querySelectorAll(container)) {
+    const heading = shelf.querySelector(title)?.textContent?.trim();
+    const hide = !!heading && shelfTitles.includes(heading);
+    shelf.classList.toggle("sb-hide", hide);
+    if (hide) hidShelf = true;
+  }
+}
+
+/** Channel filtering, the subscription pen and the shelf-title hides are YouTube's alone. */
+function applyYoutube() {
   readSubs();
   const allow = allowed();
   // Subscribed videos are penned into their own feed. Reusing blacklist means "is one of
   // these channels" is the tested comparison, normalising and all.
   const penSubs =
-    disabled.includes(SUBS_ELSEWHERE) && !location.pathname.startsWith(SUBS_PAGE);
+    disabled.includes(SUBS_ELSEWHERE) &&
+    !location.pathname.startsWith(SUBS_PAGE);
 
   for (const tile of document.querySelectorAll(TILE_SELECTORS)) {
     const keys = channelKeys(tile);
@@ -246,9 +284,10 @@ function loadSettings() {
   chrome.storage.local.get(
     ["sites", SUBS_KEY],
     (result: { sites?: SiteSettings; [SUBS_KEY]?: string[] }) => {
-      mode = result.sites?.youtube?.mode ?? "none";
+      const site = result.sites?.[SITE];
+      mode = site?.mode ?? "none";
+      disabled = site?.disabled ?? [];
       list = result.sites?.youtube?.list ?? [];
-      disabled = result.sites?.youtube?.disabled ?? [];
       if (result[SUBS_KEY]?.length) subs = result[SUBS_KEY];
       rebuildCss();
       apply();
@@ -269,25 +308,31 @@ new MutationObserver(schedule).observe(document.documentElement, {
 // the keys it resolved and whether it hid it. Empty keys means the selectors need updating.
 Object.assign(window, {
   __sb: () => ({
+    site: SITE,
     mode,
     list,
     subs,
     disabled,
     shelfTitles,
-    hiding: FEATURES.filter((f) => f.hide && disabled.includes(f.id)).map((f) => {
-      const found = document.querySelectorAll(f.hide as string);
-      return {
-        id: f.id,
-        matched: found.length,
-        display: found[0] ? getComputedStyle(found[0]).display : "-",
-      };
-    }),
-    rules: document.getElementById(STYLE_ID)?.textContent?.split("\n").length ?? 0,
-    shelves: [...document.querySelectorAll(SHELF)].map((sh) => ({
-      title: sh.querySelector(SHELF_TITLE)?.textContent?.trim(),
-      hidden: sh.classList.contains("sb-hide"),
-    })),
-    blocked: isBlockedPath(location.pathname, disabled),
+    hiding: features()
+      .filter((f) => f.hide && disabled.includes(f.id))
+      .map((f) => {
+        const found = document.querySelectorAll(f.hide as string);
+        return {
+          id: f.id,
+          matched: found.length,
+          display: found[0] ? getComputedStyle(found[0]).display : "-",
+        };
+      }),
+    rules:
+      document.getElementById(STYLE_ID)?.textContent?.split("\n").length ?? 0,
+    shelves: SHELVES[SITE].container
+      ? [...document.querySelectorAll(SHELVES[SITE].container)].map((sh) => ({
+          title: sh.querySelector(SHELVES[SITE].title)?.textContent?.trim(),
+          hidden: sh.classList.contains("sb-hide"),
+        }))
+      : [],
+    blocked: isBlockedPath(location.pathname, disabled, SITE),
     tiles: [...document.querySelectorAll(TILE_SELECTORS)].map((t) => ({
       tag: t.tagName.toLowerCase(),
       keys: channelKeys(t),

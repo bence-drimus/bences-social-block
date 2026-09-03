@@ -1,11 +1,18 @@
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { FEATURES } from "./features";
+import type { Feature } from "./features";
 import { useSettings } from "./hooks/useSettings";
 import { normaliseChannel } from "./match";
 import type { Modes, Site } from "./types";
 
-const MODES: Modes[] = ["none", "blockfull", "whitelist", "blacklist"];
+// Whitelist and blacklist are channel comparisons, so only YouTube has anything to
+// compare against. The others would be dead settings.
+const MODES: Record<Site, Modes[]> = {
+  youtube: ["none", "blockfull", "whitelist", "blacklist"],
+  facebook: ["none", "blockfull"],
+  reddit: ["none", "blockfull"],
+};
 
 // ponytail: hand-drawn glyphs, swap in the real brand SVGs if they read badly at 22px
 const ICONS: Record<Site, ReactNode> = {
@@ -25,6 +32,13 @@ const ICONS: Record<Site, ReactNode> = {
     <>
       <rect x="1.5" y="5" width="21" height="14" rx="4" />
       <path d="M10 9l6 3-6 3z" className="solid" />
+    </>
+  ),
+  facebook: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <path d="M15.5 8h-2a2 2 0 00-2 2v11" />
+      <path d="M9 13h5.5" />
     </>
   ),
 };
@@ -77,33 +91,48 @@ function ChannelList({
 }
 
 function FeatureToggles({
+  features,
   disabled,
   onChange,
 }: {
+  features: Feature[];
   disabled: string[];
   onChange: (next: string[]) => void;
 }) {
   return (
     <>
-      {[...new Set(FEATURES.map((f) => f.group))].map((group) => (
+      {[...new Set(features.map((f) => f.group))].map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
-          {FEATURES.filter((f) => f.group === group).map((feature) => (
-            <label key={feature.id}>
-              <input
-                type="checkbox"
-                checked={disabled.includes(feature.id)}
-                onChange={(e) =>
-                  onChange(
-                    e.target.checked
-                      ? [...disabled, feature.id]
-                      : disabled.filter((id) => id !== feature.id),
-                  )
-                }
-              />
-              {feature.label}
-            </label>
-          ))}
+          {features
+            .filter((f) => f.group === group)
+            .map((feature) => {
+              // A ticked parent already hides this, so the row is shown on and locked
+              // rather than written to storage - unticking the parent then restores
+              // exactly what was set before.
+              const covered =
+                !!feature.parent && disabled.includes(feature.parent);
+              return (
+                <label
+                  key={feature.id}
+                  className={feature.parent ? "child" : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={covered || disabled.includes(feature.id)}
+                    disabled={covered}
+                    onChange={(e) =>
+                      onChange(
+                        e.target.checked
+                          ? [...disabled, feature.id]
+                          : disabled.filter((id) => id !== feature.id),
+                      )
+                    }
+                  />
+                  {feature.label}
+                </label>
+              );
+            })}
         </fieldset>
       ))}
     </>
@@ -144,7 +173,7 @@ export default function App() {
             value={mode}
             onChange={(e) => update(active, { mode: e.target.value as Modes })}
           >
-            {MODES.map((m) => (
+            {MODES[active].map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
@@ -164,10 +193,11 @@ export default function App() {
           </>
         )}
 
-        {active === "youtube" && (
+        {FEATURES[active].length > 0 && (
           <FeatureToggles
-            disabled={sites.youtube.disabled ?? []}
-            onChange={(next) => update("youtube", { disabled: next })}
+            features={FEATURES[active]}
+            disabled={sites[active].disabled ?? []}
+            onChange={(next) => update(active, { disabled: next })}
           />
         )}
       </section>

@@ -12,7 +12,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.youtube.com/*"
+        "*://www.youtube.com/*",
+        "*://*.facebook.com/*"
       ],
       "js": [
         "content.js"
