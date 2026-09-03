@@ -3,7 +3,8 @@
 Browser extension that filters YouTube by channel, so you can keep the site for work
 without the feed pulling you elsewhere.
 
-Pick a mode per site from the popup:
+The popup opens on whichever site the current tab is on, and starts with nothing selected
+anywhere else. Pick a mode per site:
 
 - `none` leaves the site alone
 - `whitelist` hides video tiles from any channel not on your list

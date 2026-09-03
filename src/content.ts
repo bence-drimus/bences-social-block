@@ -1,5 +1,10 @@
 import { FEATURES } from "./features";
-import { channelFromRows, isBlockedPath, shouldHideTile } from "./match";
+import {
+  channelFromRows,
+  isBlockedPath,
+  shouldHideTile,
+  siteFromHostname,
+} from "./match";
 import type { Modes, Site, SiteSettings } from "./types";
 
 // ponytail: YouTube renames these renderers and A/B tests layouts. If filtering stops
@@ -45,9 +50,8 @@ const SUBS_PAGE = "/feed/subscriptions";
 const SUBS_ELSEWHERE = "subsElsewhere";
 // One content script serves both sites: the CSS, page blanking and settings plumbing are
 // site-agnostic, and only the tile filtering below is YouTube's.
-const SITE: Site = location.hostname.endsWith("facebook.com")
-  ? "facebook"
-  : "youtube";
+// The fallback never fires in practice - the manifest only injects us on matched hosts.
+const SITE: Site = siteFromHostname(location.hostname) ?? "youtube";
 
 const OVERLAY_ID = "sb-blocked";
 const STYLE_ID = "sb-style";

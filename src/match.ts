@@ -2,6 +2,22 @@
 import { FEATURES } from "./features.ts";
 import type { Modes, Site } from "./types.ts";
 
+/** The hostname that identifies each site. Reddit has no rows yet, but the popup lists it. */
+const HOSTS: Record<Site, string> = {
+  reddit: "reddit.com",
+  youtube: "youtube.com",
+  facebook: "facebook.com",
+};
+
+/** The site a hostname belongs to, or null when it is none of them. */
+export function siteFromHostname(hostname: string): Site | null {
+  const host = hostname.toLowerCase();
+  const found = (Object.keys(HOSTS) as Site[]).find(
+    (site) => host === HOSTS[site] || host.endsWith(`.${HOSTS[site]}`),
+  );
+  return found ?? null;
+}
+
 /** `@MKBHD`, `youtube.com/@mkbhd/videos` and `MKBHD` all collapse to `mkbhd`. */
 export function normaliseChannel(raw: string): string {
   const s = raw

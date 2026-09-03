@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { FEATURES } from "./features";
 import type { Feature } from "./features";
 import { useSettings } from "./hooks/useSettings";
-import { normaliseChannel } from "./match";
-import type { Modes, Site } from "./types";
+import { normaliseChannel, siteFromHostname } from "./match";
+import type { Modes, Site, SiteSettings } from "./types";
 
 // Whitelist and blacklist are channel comparisons, so only YouTube has anything to
 // compare against. The others would be dead settings.
@@ -139,13 +139,78 @@ function FeatureToggles({
   );
 }
 
+/** The site whose tab is in front, or null when the user is somewhere else entirely. */
+function useActiveSite() {
+  const [site, setSite] = useState<Site | null>(null);
+
+  useEffect(() => {
+    // activeTab makes the url readable, but only from the click that opened this popup, so
+    // read it once here. No url means no permission or an internal page: leave it unset.
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      if (!tab?.url) return;
+      setSite(siteFromHostname(new URL(tab.url).hostname));
+    });
+  }, []);
+
+  return [site, setSite] as const;
+}
+
+function SitePanel({
+  site,
+  sites,
+  update,
+}: {
+  site: Site;
+  sites: SiteSettings;
+  update: <S extends Site>(site: S, patch: Partial<SiteSettings[S]>) => void;
+}) {
+  const { mode } = sites[site];
+  const filtering = mode === "whitelist" || mode === "blacklist";
+
+  return (
+    <>
+      <h1>{site}</h1>
+      <label>
+        Mode
+        <select
+          value={mode}
+          onChange={(e) => update(site, { mode: e.target.value as Modes })}
+        >
+          {MODES[site].map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {site === "youtube" && filtering && (
+        <>
+          <ChannelList
+            list={sites.youtube.list}
+            onChange={(next) => update("youtube", { list: next })}
+          />
+          {mode === "whitelist" && (
+            <p className="hint">Your subscriptions are always allowed.</p>
+          )}
+        </>
+      )}
+
+      {FEATURES[site].length > 0 && (
+        <FeatureToggles
+          features={FEATURES[site]}
+          disabled={sites[site].disabled ?? []}
+          onChange={(next) => update(site, { disabled: next })}
+        />
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const { sites, update } = useSettings();
-  const [active, setActive] = useState<Site>("youtube");
+  const [active, setActive] = useActiveSite();
   if (!sites) return null;
-
-  const { mode } = sites[active];
-  const filtering = mode === "whitelist" || mode === "blacklist";
 
   return (
     <div className="popup">
@@ -166,39 +231,10 @@ export default function App() {
       </nav>
 
       <section>
-        <h1>{active}</h1>
-        <label>
-          Mode
-          <select
-            value={mode}
-            onChange={(e) => update(active, { mode: e.target.value as Modes })}
-          >
-            {MODES[active].map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {active === "youtube" && filtering && (
-          <>
-            <ChannelList
-              list={sites.youtube.list}
-              onChange={(next) => update("youtube", { list: next })}
-            />
-            {mode === "whitelist" && (
-              <p className="hint">Your subscriptions are always allowed.</p>
-            )}
-          </>
-        )}
-
-        {FEATURES[active].length > 0 && (
-          <FeatureToggles
-            features={FEATURES[active]}
-            disabled={sites[active].disabled ?? []}
-            onChange={(next) => update(active, { disabled: next })}
-          />
+        {active ? (
+          <SitePanel site={active} sites={sites} update={update} />
+        ) : (
+          <p className="hint">Pick a site, or open one in this tab.</p>
         )}
       </section>
     </div>

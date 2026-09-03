@@ -4,7 +4,22 @@ import {
   isBlockedPath,
   normaliseChannel,
   shouldHideTile,
+  siteFromHostname,
 } from "./match.ts";
+
+assert.equal(siteFromHostname("www.youtube.com"), "youtube");
+assert.equal(siteFromHostname("m.youtube.com"), "youtube");
+assert.equal(siteFromHostname("youtube.com"), "youtube");
+assert.equal(siteFromHostname("WWW.FACEBOOK.COM"), "facebook");
+assert.equal(siteFromHostname("web.facebook.com"), "facebook");
+assert.equal(siteFromHostname("old.reddit.com"), "reddit");
+assert.equal(siteFromHostname("example.com"), null);
+assert.equal(siteFromHostname(""), null);
+// a lookalike domain is not the site
+assert.equal(siteFromHostname("notyoutube.com"), null);
+assert.equal(siteFromHostname("facebook.com.evil.test"), null);
+
+console.log("siteFromHostname ok");
 
 assert.equal(normaliseChannel("@MKBHD"), "mkbhd");
 assert.equal(normaliseChannel("  MKBHD  "), "mkbhd");
