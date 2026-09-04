@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": true,
   },
   "include": ["src"],
-  "exclude": ["src/match.check.ts"],
+  "exclude": ["src/match.check.ts", "src/release.check.ts"],
 }

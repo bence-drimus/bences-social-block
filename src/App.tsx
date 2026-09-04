@@ -3,8 +3,13 @@ import type { FormEvent, ReactNode } from "react";
 import { FEATURES } from "./features";
 import type { Feature } from "./features";
 import { useSettings } from "./hooks/useSettings";
-import { normaliseChannel, siteFromHostname } from "./match";
+import { normaliseChannel, siteFromUrl } from "./match";
+import { PRESETS } from "./presets";
+import type { Preset } from "./presets";
 import type { Modes, Site, SiteSettings } from "./types";
+
+/** The settings page is a nav entry like a site, and the fallback when no site matches. */
+type Panel = Site | "settings";
 
 // Whitelist and blacklist are channel comparisons, so only YouTube has anything to
 // compare against. The others would be dead settings.
@@ -15,7 +20,14 @@ const MODES: Record<Site, Modes[]> = {
 };
 
 // ponytail: hand-drawn glyphs, swap in the real brand SVGs if they read badly at 22px
-const ICONS: Record<Site, ReactNode> = {
+const ICONS: Record<Panel, ReactNode> = {
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6" />
+      <path d="M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9" />
+    </>
+  ),
   reddit: (
     <>
       <circle cx="12" cy="14.5" r="6.5" />
@@ -139,20 +151,128 @@ function FeatureToggles({
   );
 }
 
-/** The site whose tab is in front, or null when the user is somewhere else entirely. */
-function useActiveSite() {
-  const [site, setSite] = useState<Site | null>(null);
+/** The panel to open on: the site whose tab is in front, else the settings page. */
+function useActivePanel() {
+  const [panel, setPanel] = useState<Panel>("settings");
 
   useEffect(() => {
     // activeTab makes the url readable, but only from the click that opened this popup, so
-    // read it once here. No url means no permission or an internal page: leave it unset.
-    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      if (!tab?.url) return;
-      setSite(siteFromHostname(new URL(tab.url).hostname));
-    });
+    // read it once here. Everything about this is best-effort: no url means an internal
+    // page, and no chrome.tabs at all means the permission was never granted. Both stay on
+    // settings. Guarded because a throw in an effect unmounts the whole popup, which
+    // presents as a toolbar icon that does nothing when clicked.
+    try {
+      chrome.tabs?.query({ active: true, currentWindow: true }, ([tab]) =>
+        setPanel((current) => siteFromUrl(tab?.url) ?? current),
+      );
+    } catch {
+      // no tabs access - the settings panel is the right place to land anyway
+    }
   }, []);
 
-  return [site, setSite] as const;
+  return [panel, setPanel] as const;
+}
+
+/**
+ * Importing throws away what is already set, so it asks which sites first. Two steps
+ * rather than window.confirm, which a browser is free to dismiss along with the popup.
+ */
+function PresetImport({
+  preset,
+  onImport,
+}: {
+  preset: Preset;
+  onImport: (sites: Site[]) => void;
+}) {
+  const covered = Object.keys(preset.sites) as Site[];
+  // null while the button is idle, a (possibly empty) selection while it is asking.
+  const [picked, setPicked] = useState<Site[] | null>(null);
+
+  if (!picked)
+    return (
+      <button
+        type="button"
+        className="preset"
+        onClick={() => setPicked(covered)}
+      >
+        Import {preset.name}
+      </button>
+    );
+
+  return (
+    <>
+      <label>
+        <input
+          type="checkbox"
+          checked={picked.length === covered.length}
+          onChange={(e) => setPicked(e.target.checked ? covered : [])}
+        />
+        All
+      </label>
+      {covered.map((site) => (
+        <label key={site} className="child">
+          <input
+            type="checkbox"
+            checked={picked.includes(site)}
+            onChange={(e) =>
+              setPicked(
+                e.target.checked
+                  ? [...picked, site]
+                  : picked.filter((s) => s !== site),
+              )
+            }
+          />
+          <span className="cap">{site}</span>
+        </label>
+      ))}
+      <p className="hint">Replaces everything set for the sites you pick.</p>
+      <button
+        type="button"
+        className="preset"
+        disabled={picked.length === 0}
+        onClick={() => {
+          onImport(picked);
+          setPicked(null);
+        }}
+      >
+        Import
+      </button>
+      <button type="button" className="preset" onClick={() => setPicked(null)}>
+        Cancel
+      </button>
+    </>
+  );
+}
+
+function SettingsPanel({
+  replaceSites,
+}: {
+  replaceSites: (patch: Partial<SiteSettings>) => void;
+}) {
+  return (
+    <>
+      <h1>Settings</h1>
+      <p className="hint">
+        Ready-made configurations. Pick a site on the left to set one up
+        yourself.
+      </p>
+      {PRESETS.map((preset) => (
+        <fieldset key={preset.name}>
+          <legend>{preset.name}</legend>
+          <PresetImport
+            preset={preset}
+            onImport={(chosen) =>
+              replaceSites(
+                Object.fromEntries(
+                  chosen.map((site) => [site, preset.sites[site]]),
+                ) as Partial<SiteSettings>,
+              )
+            }
+          />
+        </fieldset>
+      ))}
+    </>
+  );
 }
 
 function SitePanel({
@@ -170,6 +290,14 @@ function SitePanel({
   return (
     <>
       <h1>{site}</h1>
+
+      {FEATURES[site].length === 0 && (
+        <p className="hint">
+          <span className="cap">{site}</span> is not supported yet - the mode
+          below has no effect.
+        </p>
+      )}
+
       <label>
         Mode
         <select
@@ -208,33 +336,35 @@ function SitePanel({
 }
 
 export default function App() {
-  const { sites, update } = useSettings();
-  const [active, setActive] = useActiveSite();
+  const { sites, update, replaceSites } = useSettings();
+  const [active, setActive] = useActivePanel();
   if (!sites) return null;
+
+  const panels: Panel[] = ["settings", ...(Object.keys(sites) as Site[])];
 
   return (
     <div className="popup">
       <nav>
-        {(Object.keys(sites) as Site[]).map((site) => (
+        {panels.map((panel) => (
           <button
-            key={site}
+            key={panel}
             type="button"
-            aria-label={site}
-            aria-pressed={site === active}
-            onClick={() => setActive(site)}
+            aria-label={panel}
+            aria-pressed={panel === active}
+            onClick={() => setActive(panel)}
           >
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-              {ICONS[site]}
+              {ICONS[panel]}
             </svg>
           </button>
         ))}
       </nav>
 
       <section>
-        {active ? (
-          <SitePanel site={active} sites={sites} update={update} />
+        {active === "settings" ? (
+          <SettingsPanel replaceSites={replaceSites} />
         ) : (
-          <p className="hint">Pick a site, or open one in this tab.</p>
+          <SitePanel site={active} sites={sites} update={update} />
         )}
       </section>
     </div>

@@ -21,5 +21,16 @@ export function useSettings() {
     saveSettings({ sites: next });
   }
 
-  return { sites, update };
+  /**
+   * Several sites in one write. Calling update() in a loop would not do: each call spreads
+   * the same stale `sites`, so only the last site would survive.
+   */
+  function replaceSites(patch: Partial<SiteSettings>) {
+    if (!sites) return;
+    const next: SiteSettings = { ...sites, ...patch };
+    setSites(next);
+    saveSettings({ sites: next });
+  }
+
+  return { sites, update, replaceSites };
 }

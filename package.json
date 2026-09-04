@@ -1,14 +1,15 @@
 {
   "name": "social-block",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && vite build --config vite.content.config.ts",
     "lint": "oxlint",
     "preview": "vite preview",
-    "check": "node src/match.check.ts"
+    "check": "node src/match.check.ts && node src/release.check.ts",
+    "package": "test -z \"$(git status --porcelain)\" && npm run check && npm run build && mkdir -p release && (cd dist && zip -qr ../release/social-block-$npm_package_version.zip .) && git archive --format=zip --prefix=social-block/ -o release/social-block-$npm_package_version-sources.zip HEAD"
   },
   "dependencies": {
     "react": "^19.2.7",
@@ -23,5 +24,8 @@
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -162,6 +162,21 @@ fieldset label.child {
   padding-left: 20px;
 }
 
+.cap {
+  text-transform: capitalize;
+}
+
+.preset {
+  margin: 6px 6px 0 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .hint {
   margin: 0;
   font-size: 12px;

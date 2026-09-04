@@ -18,6 +18,20 @@ export function siteFromHostname(hostname: string): Site | null {
   return found ?? null;
 }
 
+/**
+ * The site a tab URL belongs to, or null. Total by design: a popup that throws while
+ * working out which panel to open would unmount itself, and a 0-height popup looks exactly
+ * like a dead toolbar icon. Anything unparseable is simply "not one of our sites".
+ */
+export function siteFromUrl(url: string | undefined): Site | null {
+  if (!url) return null;
+  try {
+    return siteFromHostname(new URL(url).hostname);
+  } catch {
+    return null;
+  }
+}
+
 /** `@MKBHD`, `youtube.com/@mkbhd/videos` and `MKBHD` all collapse to `mkbhd`. */
 export function normaliseChannel(raw: string): string {
   const s = raw

@@ -5,7 +5,12 @@ import {
   normaliseChannel,
   shouldHideTile,
   siteFromHostname,
+  siteFromUrl,
 } from "./match.ts";
+import { FEATURES } from "./features.ts";
+import { PRESETS } from "./presets.ts";
+import { mergeSites } from "./defaults.ts";
+import type { Site } from "./types.ts";
 
 assert.equal(siteFromHostname("www.youtube.com"), "youtube");
 assert.equal(siteFromHostname("m.youtube.com"), "youtube");
@@ -20,6 +25,19 @@ assert.equal(siteFromHostname("notyoutube.com"), null);
 assert.equal(siteFromHostname("facebook.com.evil.test"), null);
 
 console.log("siteFromHostname ok");
+
+assert.equal(siteFromUrl("https://www.youtube.com/watch?v=abc"), "youtube");
+assert.equal(siteFromUrl("https://web.facebook.com/"), "facebook");
+assert.equal(siteFromUrl("https://example.com/"), null);
+// the popup opens on all sorts of tabs, and none of these may throw
+assert.equal(siteFromUrl(undefined), null);
+assert.equal(siteFromUrl(""), null);
+assert.equal(siteFromUrl("chrome://extensions"), null);
+assert.equal(siteFromUrl("about:blank"), null);
+assert.equal(siteFromUrl("not a url at all"), null);
+assert.equal(siteFromUrl("http://"), null);
+
+console.log("siteFromUrl ok");
 
 assert.equal(normaliseChannel("@MKBHD"), "mkbhd");
 assert.equal(normaliseChannel("  MKBHD  "), "mkbhd");
@@ -135,3 +153,56 @@ assert.equal(isBlockedPath("/", ["home"], "facebook"), false);
 assert.equal(isBlockedPath("/", ["fbHome"], "youtube"), false);
 
 console.log("facebook paths ok");
+
+// A preset id that no longer exists in FEATURES is a dead setting: it would sit in storage
+// hiding nothing, with no row in the popup to reveal it.
+for (const preset of PRESETS) {
+  for (const [site, settings] of Object.entries(preset.sites)) {
+    const ids = FEATURES[site as Site].map((f) => f.id);
+    for (const id of settings.disabled) {
+      assert.ok(
+        ids.includes(id),
+        `${preset.name}: ${site} has no feature "${id}"`,
+      );
+    }
+  }
+}
+
+console.log("presets ok");
+
+// Storage written by an older version is missing whatever did not exist yet. Every one of
+// these used to throw while rendering the popup, leaving a 0-height window.
+assert.deepEqual(mergeSites(undefined).facebook, {
+  mode: "none",
+  disabled: [],
+});
+assert.deepEqual(mergeSites({}).facebook, { mode: "none", disabled: [] });
+// a sites object from before facebook existed
+assert.deepEqual(mergeSites({ youtube: { mode: "blacklist" } }).facebook, {
+  mode: "none",
+  disabled: [],
+});
+// youtube from before the channel list existed keeps its mode and gains the list
+assert.deepEqual(mergeSites({ youtube: { mode: "whitelist" } }).youtube, {
+  mode: "whitelist",
+  list: [],
+  disabled: [],
+});
+// real stored values win over the defaults
+assert.deepEqual(
+  mergeSites({ facebook: { mode: "blockfull", disabled: ["fbHome"] } })
+    .facebook,
+  { mode: "blockfull", disabled: ["fbHome"] },
+);
+// corrupt shapes fall back instead of reaching the UI
+assert.deepEqual(mergeSites({ youtube: { list: "nope" } }).youtube.list, []);
+assert.deepEqual(mergeSites({ youtube: { list: null } }).youtube.list, []);
+assert.deepEqual(
+  mergeSites({ facebook: { disabled: {} } }).facebook.disabled,
+  [],
+);
+assert.equal(mergeSites({ facebook: "broken" }).facebook.mode, "none");
+// unknown keys are not carried through
+assert.ok(!("junk" in mergeSites({ facebook: { junk: 1 } }).facebook));
+
+console.log("mergeSites ok");
