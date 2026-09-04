@@ -1,0 +1,17 @@
+<!-- Source for the committed PNGs next to it. No width/height, only viewBox, so a
+     rasteriser's viewport decides the size - see the regeneration command in the README.
+     Own colours rather than currentColor: a toolbar PNG cannot adapt to the theme, so the
+     mark carries its own contrast. Counters are knocked out in the square's colour rather
+     than left as holes, which keeps this to four shapes and no fill-rule. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect width="24" height="24" rx="6" fill="#1e1b4b" />
+  <g fill="#fff">
+    <rect x="6.6" y="5" width="3.2" height="14" rx="0.6" />
+    <path d="M9 5h4.1a3.6 3.6 0 0 1 0 7.2H9z" />
+    <path d="M9 11.8h4.6a3.6 3.6 0 0 1 0 7.2H9z" />
+  </g>
+  <g fill="#1e1b4b">
+    <rect x="10.4" y="7" width="4" height="3.2" rx="1.6" />
+    <rect x="10.4" y="13.8" width="4.4" height="3.2" rx="1.6" />
+  </g>
+</svg>
