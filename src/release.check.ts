@@ -49,6 +49,8 @@ assert.equal(
   "bences-social-block@bence-drimus",
 );
 
+const strictMin = manifest.browser_specific_settings.gecko.strict_min_version;
+
 // AMO rejects the upload outright without this key. "none" states that nothing is
 // collected or transmitted, and Mozilla does not allow it alongside any category.
 const collection =
@@ -62,11 +64,16 @@ assert.ok(
   !collection.required.includes("none") || collection.required.length === 1,
   '"none" cannot be combined with a data category',
 );
+// Firefox only honours data_collection_permissions from 140. A lower floor would ship a
+// declaration that older versions ignore, which is what AMO's linter warns about.
+assert.ok(
+  parseFloat(strictMin) >= 140,
+  `data_collection_permissions needs Firefox 140 or newer, manifest says ${strictMin}`,
+);
 
 // querySelectorAll throws on an unsupported :has(), so the content script dies outright on
 // Firefox below 121 - it does not merely filter less. Derived from the selectors rather
 // than hardcoded, so dropping :has() everywhere would free the floor honestly.
-const strictMin = manifest.browser_specific_settings.gecko.strict_min_version;
 const usesHas = Object.values(FEATURES)
   .flat()
   .some((f) => f.hide?.includes(":has("));

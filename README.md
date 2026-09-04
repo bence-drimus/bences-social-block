@@ -91,10 +91,11 @@ reload on the card after each build. Chrome logs one "Unrecognized manifest key"
 `browser_specific_settings`, which is the Firefox block and is expected.
 
 Firefox: `about:debugging#/runtime/this-firefox`, Load Temporary Add-on, pick
-`dist/manifest.json`. It goes away when Firefox restarts. Firefox 127 is the minimum -
-`strict_min_version` says so - both because `:has()` needs 121 and because 127 is where
-Firefox started granting MV3 host permissions at install. On older versions the content
-script would either crash or never be allowed to run. If site access has been revoked by
+`dist/manifest.json`. It goes away when Firefox restarts. Firefox 140 is the minimum -
+`strict_min_version` says so. Three things set that floor: `:has()` needs 121, MV3 host
+permissions are only granted at install from 127, and `data_collection_permissions` is
+only honoured from 140. Below it the content script would crash, never be allowed to run,
+or ship a data declaration the browser ignores. If site access has been revoked by
 hand, re-grant it from the add-on's Permissions tab.
 
 ## Debugging
