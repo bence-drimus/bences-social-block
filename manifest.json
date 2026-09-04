@@ -24,8 +24,11 @@
   "minimum_chrome_version": "105",
   "browser_specific_settings": {
     "gecko": {
-      "id": "social-block@lessquod",
-      "strict_min_version": "127.0"
+      "id": "bences-social-block@bence-drimus",
+      "strict_min_version": "127.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   }
 }

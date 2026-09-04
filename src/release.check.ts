@@ -46,7 +46,21 @@ assert.ok(
 // with its users and reviews, irreversibly. It has nothing to do with the display name.
 assert.equal(
   manifest.browser_specific_settings.gecko.id,
-  "social-block@lessquod",
+  "bences-social-block@bence-drimus",
+);
+
+// AMO rejects the upload outright without this key. "none" states that nothing is
+// collected or transmitted, and Mozilla does not allow it alongside any category.
+const collection =
+  manifest.browser_specific_settings.gecko.data_collection_permissions;
+assert.ok(collection, "gecko.data_collection_permissions is required by AMO");
+assert.ok(
+  Array.isArray(collection.required) && collection.required.length > 0,
+  "data_collection_permissions.required must list at least one value",
+);
+assert.ok(
+  !collection.required.includes("none") || collection.required.length === 1,
+  '"none" cannot be combined with a data category',
 );
 
 // querySelectorAll throws on an unsupported :has(), so the content script dies outright on
