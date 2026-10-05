@@ -19,8 +19,26 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   {
     name: "Bence's setup",
-    description: "Facebook with the feed extras and rails hidden. Marketplace stays.",
+    description:
+      "YouTube without Shorts, Home or suggestions. Facebook with the extras hidden, Marketplace kept.",
     sites: {
+      youtube: {
+        mode: "none",
+        list: [],
+        // The subscriptions page stays reachable on purpose - subsElsewhere pens them there.
+        disabled: [
+          "shortsContent",
+          "topicChips",
+          "topNews",
+          "subsElsewhere",
+          "endscreen",
+          "shortsPage",
+          "home",
+          "playables",
+          "premium",
+          "notifications",
+        ],
+      },
       facebook: {
         mode: "none",
         // Marketplace stays reachable on purpose. fbShortcuts is left out because
