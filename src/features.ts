@@ -55,10 +55,10 @@ function fbCard(inner: string): string {
  * is left where the icon was; the bare label rule is the fallback if that nesting changes.
  */
 function fbBar(label: string): string {
-  return [
-    `[role="navigation"] > div:has([aria-label="${label}"])`,
-    `[aria-label="${label}"]`,
-  ].join(",");
+  // Buttons only, so the popup dialog sharing the label is left alone. The count gets
+  // appended when there is something unread - "Notifications, 4 unread".
+  const button = `[role="button"]:is([aria-label="${label}"],[aria-label^="${label},"])`;
+  return [`[role="navigation"] > div:has(${button})`, button].join(",");
 }
 
 // ponytail: these selectors are the calibration knob. Both sites rename things - YouTube
@@ -79,6 +79,8 @@ export const FEATURES: Record<Site, Feature[]> = {
         "ytm-shorts-lockup-view-model",
         "ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model)",
         "ytd-rich-shelf-renderer:has(ytm-shorts-lockup-view-model)",
+        // Search results shelf. Hiding only the tiles left its "Shorts" heading behind.
+        "grid-shelf-view-model:has(ytm-shorts-lockup-view-model)",
         'ytd-video-renderer:has(a[href^="/shorts"])',
         'yt-lockup-view-model:has(a[href^="/shorts"])',
       ].join(","),
@@ -135,7 +137,15 @@ export const FEATURES: Record<Site, Feature[]> = {
       id: "shortsPage",
       group: "Block pages",
       label: "Shorts page",
-      hide: navEntry("/shorts"),
+      // Not navEntry: the full guide's Shorts link has no href at all (it plays through a
+      // reel endpoint), so its title is the only hook and this breaks in another UI
+      // language. `:not([href])` keeps it off a subscribed channel that happens to be
+      // called Shorts. The mini guide links "/shorts/" with a trailing slash, hence the
+      // prefix.
+      hide: [
+        'ytd-guide-entry-renderer:has(a[title="Shorts"]:not([href]))',
+        'ytd-mini-guide-entry-renderer:has(a[href^="/shorts"])',
+      ].join(","),
       block: /^\/shorts/,
     },
     {
