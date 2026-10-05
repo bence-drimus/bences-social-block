@@ -1,7 +1,7 @@
 # Bence's Social Block
 
-Browser extension that hides or blocks the distracting parts of YouTube and Facebook, so
-you can keep using those sites for work or study without the feed pulling you elsewhere.
+Browser extension that hides or blocks the distracting parts of YouTube and Facebook, and
+can block Reddit outright, so you can keep using those sites for work or study without the feed pulling you elsewhere.
 
 I wrote it for myself and use it every day. It is published in case it is useful to you
 too.
@@ -9,12 +9,12 @@ too.
 The popup opens on whichever site the current tab is on, and on the settings page anywhere
 else. Pick a mode per site:
 
-- `none` leaves the site alone
-- `whitelist` hides video tiles from any channel not on your list
-- `blacklist` hides video tiles from the channels on your list
-- `blockfull` blocks the whole site
+- Normal (`none`) applies only the switches you turned on
+- Allowlist (`whitelist`) hides video tiles from any channel not on your list
+- Blocklist (`blacklist`) hides video tiles from the channels on your list
+- Block site (`blockfull`) blocks the whole site
 
-In whitelist mode your subscriptions are allowed automatically and are not shown in the
+In Allowlist mode your subscriptions are allowed automatically and are not shown in the
 list.
 
 Channels can be added as a handle (`@mkbhd`), a URL, or the display name. Opening a video
@@ -23,17 +23,17 @@ whose channel is filtered out bounces you back to the previous page.
 Facebook has its own toggles: the post composer, Stories, Reels in the feed and People you
 may know under Hide content; Home, Reels, Groups, Gaming, Friends, Memories, Saved and
 Marketplace under Block pages; Meta AI, Your shortcuts, Notifications, Messenger, the
-Facebook menu, the contacts sidebar and the whole left sidebar under Hide interface. Ticking
-a page also removes its entry from the left rail. Groups blocks the browse pages only, so an
-individual group you joined stays readable. Its modes are `none` and `blockfull` - the other
+Facebook menu, the contacts sidebar and the whole left sidebar under Hide interface. Switching
+on a page also removes its entry from the left rail. Groups blocks the browse pages only, so an
+individual group you joined stays readable. Its modes are Normal and Block site - the other
 two filter by channel, which Facebook has no equivalent of yet.
 
-Reddit is in the popup but does nothing yet, and says so. Categories are not implemented.
+Reddit has Normal and Block site only, with no switches yet. Categories are not implemented.
 
 ## Presets
 
-`src/presets.ts` holds ready-made configurations, offered on the settings page - the first
-entry in the popup's icon rail. Importing one asks which of its sites to take, all ticked by
+`src/presets.ts` holds ready-made configurations, offered on the settings page behind the
+gear in the popup header. Applying one asks which of its sites to take, all picked by
 default, and replaces everything set for those. A preset only names the sites it covers, so
 the rest are left alone either way.
 

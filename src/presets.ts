@@ -11,12 +11,15 @@ import type { Site, SiteSettings } from "./types.ts";
  */
 export interface Preset {
   name: string;
+  /** One line under the name on the settings page. */
+  description: string;
   sites: Partial<{ [S in Site]: SiteSettings[S] }>;
 }
 
 export const PRESETS: Preset[] = [
   {
     name: "Bence's setup",
+    description: "Facebook with the feed extras and rails hidden. Marketplace stays.",
     sites: {
       facebook: {
         mode: "none",
