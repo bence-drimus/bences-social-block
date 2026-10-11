@@ -13,6 +13,8 @@ export default defineConfig({
   // root today, but they break the moment an HTML page lives anywhere but dist/ root, and
   // the symptom is a blank popup rather than anything that names the cause.
   base: "./",
+  // One chunk and a modern browser: the polyfill is dead weight in the popup.
+  build: { modulePreload: { polyfill: false } },
   plugins: [
     react(),
     {
