@@ -43,6 +43,11 @@ export function normaliseChannel(raw: string): string {
   return s.split(/[/?#]/)[0].trim().toLowerCase();
 }
 
+// Normalised once per list, not once per tile: the content script asks about every tile on
+// every DOM change. ponytail: keyed by array identity, so a list mutated in place would
+// read stale - callers replace their arrays rather than push into them.
+const normalised = new WeakMap<string[], Set<string>>();
+
 /**
  * `keys` are every channel identifier found on a tile (hrefs and link text), An empty `keys`
  * means we could not tell whose video it is, and such tiles are always left alone - so a
@@ -56,7 +61,11 @@ export function shouldHideTile(
   if (mode !== "whitelist" && mode !== "blacklist") return false;
   if (keys.length === 0) return false;
 
-  const wanted = new Set(list.map(normaliseChannel).filter(Boolean));
+  let wanted = normalised.get(list);
+  if (!wanted) {
+    wanted = new Set(list.map(normaliseChannel).filter(Boolean));
+    normalised.set(list, wanted);
+  }
   const listed = keys.some((k) => wanted.has(normaliseChannel(k)));
   return mode === "whitelist" ? !listed : listed;
 }

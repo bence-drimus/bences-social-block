@@ -61,6 +61,10 @@ assert.equal(shouldHideTile([], "blacklist", list), false);
 assert.equal(shouldHideTile(["/@veritasium"], "none", list), false);
 assert.equal(shouldHideTile(["/@veritasium"], "blockfull", list), false);
 
+// the per-list cache keys on identity, so a replaced list is never served a stale set
+assert.equal(shouldHideTile(["/@veritasium"], "blacklist", ["@veritasium"]), true);
+assert.equal(shouldHideTile(["/@veritasium"], "blacklist", ["@mkbhd"]), false);
+
 // display name on the tile, handle in the list, and the other way round
 assert.equal(
   shouldHideTile(["/@mkbhd", "MKBHD"], "blacklist", ["MKBHD"]),

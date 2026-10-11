@@ -91,7 +91,7 @@ let css = CSS;
 let shelfTitles: string[] = [];
 let subs: string[] = [];
 let bouncedFrom = "";
-let hidShelf = false;
+let hiddenShelves = new Set<Element>();
 
 /** The rows for whichever site this injection landed on. */
 function features() {
@@ -234,33 +234,50 @@ function apply() {
   if (SITE === "youtube") applyYoutube();
 }
 
-/** Sections CSS cannot name, matched on their heading text. */
+/**
+ * Sections CSS cannot name, matched on their heading text. A section goes when its first
+ * title is a listed one. Found from the headings up rather than from every container down,
+ * because Facebook's container selector is a :has() over every div on the page.
+ */
 function hideNamedShelves() {
   const { container, title } = SHELVES[SITE];
-  // The flag buys one more pass after the last title is unticked, to take the class back
-  // off. Without it, unticking left the section hidden until a reload.
-  if (!container || (!shelfTitles.length && !hidShelf)) return;
-  hidShelf = false;
-  for (const shelf of document.querySelectorAll(container)) {
-    const heading = shelf.querySelector(title)?.textContent?.trim();
-    const hide = !!heading && shelfTitles.includes(heading);
-    shelf.classList.toggle("sb-hide", hide);
-    if (hide) hidShelf = true;
+  if (!container) return;
+  const next = new Set<Element>();
+  if (shelfTitles.length) {
+    for (const heading of document.querySelectorAll(title)) {
+      const text = heading.textContent?.trim();
+      if (!text || !shelfTitles.includes(text)) continue;
+      // Once an ancestor has an earlier title, every one above it does too.
+      let shelf = heading.parentElement?.closest(container);
+      while (shelf?.querySelector(title) === heading) {
+        next.add(shelf);
+        shelf = shelf.parentElement?.closest(container);
+      }
+    }
   }
+  // Remembered so unticking the last title takes the class back off.
+  for (const shelf of hiddenShelves) {
+    if (!next.has(shelf)) shelf.classList.remove("sb-hide");
+  }
+  for (const shelf of next) shelf.classList.add("sb-hide");
+  hiddenShelves = next;
 }
 
 /** Channel filtering, the subscription pen and the shelf-title hides are YouTube's alone. */
 function applyYoutube() {
-  readSubs();
-  const allow = allowed();
+  const filtering = mode === "whitelist" || mode === "blacklist";
   // Subscribed videos are penned into their own feed. Reusing blacklist means "is one of
   // these channels" is the tested comparison, normalising and all.
   const penSubs =
     disabled.includes(SUBS_ELSEWHERE) &&
     !location.pathname.startsWith(SUBS_PAGE);
+  // This runs on every DOM change, so the guide and the tiles are only read when something
+  // will compare against them. Empty keys hide nothing, so the toggle still clears old hides.
+  if (mode === "whitelist" || penSubs) readSubs();
+  const allow = allowed();
 
   for (const tile of document.querySelectorAll(TILE_SELECTORS)) {
-    const keys = channelKeys(tile);
+    const keys = filtering || penSubs ? channelKeys(tile) : [];
     // A channel you listed yourself outranks the pen. Subs are left out of this check on
     // purpose, so the pen still herds the ones you never asked for back to their own page.
     const explicit = !shouldHideTile(keys, "whitelist", list);
@@ -271,7 +288,7 @@ function applyYoutube() {
     );
   }
 
-  if (location.pathname === "/watch") checkWatchPage(allow);
+  if (filtering && location.pathname === "/watch") checkWatchPage(allow);
 }
 
 let queued = false;
@@ -300,7 +317,14 @@ function loadSettings() {
 }
 
 loadSettings();
-chrome.storage.onChanged.addListener(loadSettings);
+// Settings only. Our own sbSubs cache writes would otherwise reload every open tab, and two
+// YouTube tabs whose guides list different subs could keep overwriting each other.
+// Firefox also fires this for a set() that changed nothing.
+chrome.storage.onChanged.addListener((changes) => {
+  const sites = changes.sites;
+  if (sites && JSON.stringify(sites.oldValue) !== JSON.stringify(sites.newValue))
+    loadSettings();
+});
 // childList only: our own class changes are attribute mutations, so this cannot loop.
 // It also covers YouTube's SPA navigation, so no yt-navigate-finish listener is needed.
 new MutationObserver(schedule).observe(document.documentElement, {
