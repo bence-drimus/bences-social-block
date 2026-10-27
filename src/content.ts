@@ -1,6 +1,7 @@
 import { FEATURES } from "./features";
 import {
   channelFromRows,
+  isBlockedPath,
   pageHides,
   shouldHideTile,
   siteFromHostname,
@@ -180,9 +181,9 @@ function injectCss() {
 }
 
 /** Blank a page whose nav button is switched off, leaving the header and search usable. */
-function blockPage() {
+function blockPage(pause: boolean) {
   document.documentElement.classList.add("sb-blocked-page");
-  for (const video of document.querySelectorAll("video")) video.pause();
+  if (pause) for (const video of document.querySelectorAll("video")) video.pause();
   if (document.getElementById(NOTE_ID)) return;
   const note = document.createElement("div");
   note.id = NOTE_ID;
@@ -225,7 +226,9 @@ function apply() {
 
   const hides = pageHides(location.pathname, settled, disabled, SITE);
   if (hides.blank) {
-    blockPage();
+    // Only pause on the blocked page itself. While the page being left is held blank, a
+    // video playing is the new page's, and nothing would start it again.
+    blockPage(isBlockedPath(location.pathname, disabled, SITE));
     return;
   }
   unblockPage();
