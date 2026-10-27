@@ -2,6 +2,7 @@ import { FEATURES } from "./features";
 import {
   channelFromRows,
   isBlockedPath,
+  pageHides,
   shouldHideTile,
   siteFromHostname,
 } from "./match";
@@ -46,8 +47,6 @@ const CHANNEL_HREF = /(?:^|youtube\.com)\/(?:@|channel\/|c\/|user\/)/i;
 // You all point at feed paths. Structural, so it does not care about the UI language.
 const GUIDE_SUBS = "ytd-guide-renderer a[href]";
 const SUBS_KEY = "sbSubs";
-const SUBS_PAGE = "/feed/subscriptions";
-const SUBS_ELSEWHERE = "subsElsewhere";
 // One content script serves both sites: the CSS, page blanking and settings plumbing are
 // site-agnostic, and only the tile filtering below is YouTube's.
 // The fallback never fires in practice - the manifest only injects us on matched hosts.
@@ -91,6 +90,8 @@ let css = CSS;
 let shelfTitles: string[] = [];
 let subs: string[] = [];
 let bouncedFrom = "";
+// The page YouTube last finished navigating to. Until it does, the old page is on screen.
+let settled = location.pathname;
 let hiddenShelves = new Set<Element>();
 
 /** The rows for whichever site this injection landed on. */
@@ -180,9 +181,9 @@ function injectCss() {
 }
 
 /** Blank a page whose nav button is switched off, leaving the header and search usable. */
-function blockPage() {
+function blockPage(pause: boolean) {
   document.documentElement.classList.add("sb-blocked-page");
-  for (const video of document.querySelectorAll("video")) video.pause();
+  if (pause) for (const video of document.querySelectorAll("video")) video.pause();
   if (document.getElementById(NOTE_ID)) return;
   const note = document.createElement("div");
   note.id = NOTE_ID;
@@ -223,15 +224,18 @@ function apply() {
   }
   document.getElementById(OVERLAY_ID)?.remove();
 
-  if (isBlockedPath(location.pathname, disabled, SITE)) {
-    blockPage();
+  const hides = pageHides(location.pathname, settled, disabled, SITE);
+  if (hides.blank) {
+    // Only pause on the blocked page itself. While the page being left is held blank, a
+    // video playing is the new page's, and nothing would start it again.
+    blockPage(isBlockedPath(location.pathname, disabled, SITE));
     return;
   }
   unblockPage();
 
   hideNamedShelves();
 
-  if (SITE === "youtube") applyYoutube();
+  if (SITE === "youtube") applyYoutube(hides.penSubs);
 }
 
 /**
@@ -264,13 +268,8 @@ function hideNamedShelves() {
 }
 
 /** Channel filtering, the subscription pen and the shelf-title hides are YouTube's alone. */
-function applyYoutube() {
+function applyYoutube(penSubs: boolean) {
   const filtering = mode === "whitelist" || mode === "blacklist";
-  // Subscribed videos are penned into their own feed. Reusing blacklist means "is one of
-  // these channels" is the tested comparison, normalising and all.
-  const penSubs =
-    disabled.includes(SUBS_ELSEWHERE) &&
-    !location.pathname.startsWith(SUBS_PAGE);
   // This runs on every DOM change, so the guide and the tiles are only read when something
   // will compare against them. Empty keys hide nothing, so the toggle still clears old hides.
   if (mode === "whitelist" || penSubs) readSubs();
@@ -281,6 +280,8 @@ function applyYoutube() {
     // A channel you listed yourself outranks the pen. Subs are left out of this check on
     // purpose, so the pen still herds the ones you never asked for back to their own page.
     const explicit = !shouldHideTile(keys, "whitelist", list);
+    // The pen reuses blacklist, so "is one of these channels" is the tested comparison,
+    // normalising and all.
     tile.classList.toggle(
       "sb-hide",
       shouldHideTile(keys, mode, allow) ||
@@ -326,10 +327,16 @@ chrome.storage.onChanged.addListener((changes) => {
     loadSettings();
 });
 // childList only: our own class changes are attribute mutations, so this cannot loop.
-// It also covers YouTube's SPA navigation, so no yt-navigate-finish listener is needed.
 new MutationObserver(schedule).observe(document.documentElement, {
   childList: true,
   subtree: true,
+});
+// YouTube fires this for clicks, Back and Forward once the new page is in.
+// ponytail: no fallback timer. If leaving a blocked page ever stays blank until a reload,
+// check yt-navigate-finish still fires - __sb().settled shows the path it last reported.
+document.addEventListener("yt-navigate-finish", () => {
+  settled = location.pathname;
+  apply();
 });
 
 // Calibration knob: run __sb() in the page console to see every tile the filter found,
@@ -341,6 +348,7 @@ Object.assign(window, {
     list,
     subs,
     disabled,
+    settled,
     shelfTitles,
     hiding: features()
       .filter((f) => f.hide && disabled.includes(f.id))
@@ -360,7 +368,7 @@ Object.assign(window, {
           hidden: sh.classList.contains("sb-hide"),
         }))
       : [],
-    blocked: isBlockedPath(location.pathname, disabled, SITE),
+    blocked: pageHides(location.pathname, settled, disabled, SITE).blank,
     tiles: [...document.querySelectorAll(TILE_SELECTORS)].map((t) => ({
       tag: t.tagName.toLowerCase(),
       keys: channelKeys(t),
