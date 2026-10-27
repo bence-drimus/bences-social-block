@@ -93,3 +93,29 @@ export function isBlockedPath(
     (f) => f.block && disabled.includes(f.id) && f.block.test(pathname),
   );
 }
+
+const SUBS_PAGE = "/feed/subscriptions";
+const SUBS_ELSEWHERE = "subsElsewhere";
+
+/**
+ * What to hide, given the URL (`current`) and the page still on screen (`settled`). YouTube
+ * changes the URL first and swaps the new page in once loaded, so anything hidden on either
+ * page stays hidden until then. `penSubs` keeps subscribed videos to their own page. Other
+ * sites never report a settled page, so only their URL counts.
+ */
+export function pageHides(
+  current: string,
+  settled: string,
+  disabled: string[],
+  site: Site,
+): { blank: boolean; penSubs: boolean } {
+  const shown = site === "youtube" ? settled : current;
+  const onSubs = (path: string) => path.startsWith(SUBS_PAGE);
+  return {
+    blank:
+      isBlockedPath(current, disabled, site) ||
+      isBlockedPath(shown, disabled, site),
+    penSubs:
+      disabled.includes(SUBS_ELSEWHERE) && !(onSubs(current) && onSubs(shown)),
+  };
+}

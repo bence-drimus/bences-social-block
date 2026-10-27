@@ -3,6 +3,7 @@ import {
   channelFromRows,
   isBlockedPath,
   normaliseChannel,
+  pageHides,
   shouldHideTile,
   siteFromHostname,
   siteFromUrl,
@@ -157,6 +158,48 @@ assert.equal(isBlockedPath("/", ["home"], "facebook"), false);
 assert.equal(isBlockedPath("/", ["fbHome"], "youtube"), false);
 
 console.log("facebook paths ok");
+
+// YouTube changes the URL first and swaps the page in later, so until it finishes the page
+// being left is still on screen. `current` is the URL, `settled` the last finished page.
+const disabled = ["home", "subsElsewhere"];
+// leaving Home: its feed is still showing until YouTube finishes
+assert.equal(pageHides("/results", "/", disabled, "youtube").blank, true);
+// ...and once it has, the new page is in and shows
+assert.equal(pageHides("/results", "/results", disabled, "youtube").blank, false);
+// heading to Home blanks straight away, before its feed arrives
+assert.equal(pageHides("/", "/results", disabled, "youtube").blank, true);
+// heading to Subscriptions: the page being left keeps its subscribed videos hidden
+assert.equal(
+  pageHides("/feed/subscriptions", "/", disabled, "youtube").penSubs,
+  true,
+);
+// ...until Subscriptions itself is in
+assert.equal(
+  pageHides("/feed/subscriptions", "/feed/subscriptions", disabled, "youtube")
+    .penSubs,
+  false,
+);
+// leaving Subscriptions pens them again straight away
+assert.equal(
+  pageHides("/", "/feed/subscriptions", disabled, "youtube").penSubs,
+  true,
+);
+// nothing switched off: nothing to hold back, wherever YouTube has got to
+assert.deepEqual(pageHides("/results", "/", [], "youtube"), {
+  blank: false,
+  penSubs: false,
+});
+assert.deepEqual(pageHides("/feed/subscriptions", "/", [], "youtube"), {
+  blank: false,
+  penSubs: false,
+});
+// Facebook never settles, so a settled path there would keep a page blank for good
+assert.equal(
+  pageHides("/marketplace", "/", ["fbHome"], "facebook").blank,
+  false,
+);
+
+console.log("pageHides ok");
 
 // A preset id that no longer exists in FEATURES is a dead setting: it would sit in storage
 // hiding nothing, with no row in the popup to reveal it.
