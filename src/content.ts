@@ -71,6 +71,7 @@ const CSS = `
 }
 html.sb-blocked-page ytd-page-manager,
 html.sb-blocked-page div[role="main"] { display: none !important; }
+html.sb-held-page ytd-page-manager { visibility: hidden !important; }
 #${NOTE_ID} {
   position: fixed;
   top: 40vh;
@@ -181,9 +182,11 @@ function injectCss() {
 }
 
 /** Blank a page whose nav button is switched off, leaving the header and search usable. */
-function blockPage(pause: boolean) {
-  document.documentElement.classList.add("sb-blocked-page");
-  if (pause) for (const video of document.querySelectorAll("video")) video.pause();
+function blockPage(blocked: boolean) {
+  // A held page keeps its layout, or YouTube lays the new page out at zero width.
+  document.documentElement.classList.toggle("sb-blocked-page", blocked);
+  document.documentElement.classList.toggle("sb-held-page", !blocked);
+  if (blocked) for (const video of document.querySelectorAll("video")) video.pause();
   if (document.getElementById(NOTE_ID)) return;
   const note = document.createElement("div");
   note.id = NOTE_ID;
@@ -192,7 +195,7 @@ function blockPage(pause: boolean) {
 }
 
 function unblockPage() {
-  document.documentElement.classList.remove("sb-blocked-page");
+  document.documentElement.classList.remove("sb-blocked-page", "sb-held-page");
   document.getElementById(NOTE_ID)?.remove();
 }
 
